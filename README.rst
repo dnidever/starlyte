@@ -16,4 +16,3 @@ You can also pip install directly from GitHub::
 
     pip install git+https://github.com/dnidever/popstarlight
 
-k
