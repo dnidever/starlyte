@@ -11,4 +11,6 @@ setup(name='popstarlight',
       url = 'https://github.com/dnidever/popstarlight',
       package_dir = {'': 'python'},
       packages = ["popstarlight"]
+      install_requires=['numpy','astropy(>=4.0)','scipy','dlnpyutils(>=1.0.3)','ferre','gdown'],
+      include_package_data=True
 )

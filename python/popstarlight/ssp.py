@@ -6,6 +6,7 @@ import numpy as np
 from glob import glob
 from dlnpyutils import utils as dln
 from astropy.table import Table
+from astropy.io import fits
 from scipy.interpolate import interp1d
 from scipy.stats import binned_statistic_2d
 from . import ferre,utils
@@ -84,6 +85,7 @@ def ferre_interp(pars):
     # Loop over gridfiles and get all of the spectra
     # that fall in its teff range
     count = 0
+    flux = None
     for i in range(ngrids):
         ind, = np.where(gridindex == i)
         nind = len(ind)
@@ -99,7 +101,7 @@ def ferre_interp(pars):
         fout = ferre.interp(newpars2,grid=gfile)
 
         # Wavelength solution
-        if i==0:
+        if flux is None:
             wave = fout['wave']
             npix = len(wave)
             flux = np.zeros((npars,npix),float) 
@@ -127,11 +129,70 @@ def ferre_interp(pars):
     out = {'wave':wave,'flux':flux}
     return out
 
+
+def sspgrid(ages,metals,alphas,outdir='./',clobber=False):
+    """  Run a grid of SSP spectra."""
+
+    nage = len(ages)
+    nmetal = len(metals)
+    nalpha = len(alphas)
+    nspectra = nage * nmetal * nalpha
+    print('Creating {:d} SSP spectra'.format(nspectra))
     
+    # age, metallicity, alpha abundance
+    dt = [('age',float),('metal',float),('alpha',float),('luminosity',float)]
+    pars = np.zeros((nage,nmetal,nalpha),dtype=np.dtype(dt))
+    count = 0
+    for i in range(nage):
+        age = ages[i]
+        for j in range(nmetal):
+            metal = metals[j]
+            for k in range(nalpha):
+                alpha = alphas[k]
+                print('{:d} (age,[M/H],[alpha/M])=({:.4f},{:.4f},{:.4f})'.format(count+1,age,metal,alpha))
+
+                outfile = 'ssp_a{:.3f}m{:+.2f}a{:+.2f}.fits'.format(11,metal,alpha)
+                if os.path.exists(outdir+outfile) and clobber==False:
+                    print(outfile+' already exists and clobber not set')
+                    spectrum,hd = fits.getdata(outdir+outfile,header=True)
+                    wave = np.arange(hd['naxis1'])*hd['cdelt1']+hd['crval1']
+                else:  
+                    wave,spectrum = ssp(age,metal,alpha)
+                    
+                # Start grid
+                if count == 0:
+                    nwave = len(wave)
+                    spectra = np.zeros((nage,nmetal,nalpha,nwave),float)
+
+                # Plug in the spectrum
+                spectra[i,j,k,:] = spectrum
+                dw = wave[1]-wave[0]
+                luminosity = np.sum(spectrum*dw)
+                pars['age'][i,j,k] = age
+                pars['metal'][i,j,k] = metal
+                pars['alpha'][i,j,k] = alpha
+                pars['luminosity'][i,j,k] = luminosity
+
+                # Write to a file in case it crashes at some point
+                if os.path.exists(outdir+outfile)==False or clobber:
+                    hdu = fits.PrimaryHDU(spectrum)
+                    hdu.header['CRVAL1'] = wave[0]
+                    hdu.header['CRPIX1'] = 1
+                    hdu.header['CDELT1'] = np.round(wave[1]-wave[0],6)
+                    hdu.header['DC-FLAG'] = 0
+                    hdu.writeto(outdir+outfile)
+                
+                print(' ')
+                
+                count += 1
+
+    return wave,spectra,pars
+
+                
 def ssp(age,metal,alpha,alliso=None):
     """ Make SSP for a given age and metal."""
 
-    print('Age = {:.2f} Gyr'.format(age))
+    print('Age = {:.4f} Gyr'.format(age))
     print('[M/H] = {:.2f}'.format(metal))
     print('[alpha/Fe] = {:.2f}'.format(alpha))    
 
@@ -141,25 +202,27 @@ def ssp(age,metal,alpha,alliso=None):
     
     # --- Isochrones ---
     if alliso is None:
-        alliso = Table.read('/Users/nidever/isochrone/parsec_gaiaedr3_2mass/parsec_gaiaedr3_2mass.fits')
-    umetal = np.unique(alliso['MH'])
-    uage = np.unique(10**alliso['LOGAGE']/1e9)
+        alliso = Table.read(utils.datadir()+'ssp_isochrones.fits.gz')
+        for c in alliso.colnames: alliso[c].name = c.upper()
+        #alliso = Table.read('/Users/nidever/isochrone/parsec_gaiaedr3_2mass/parsec_gaiaedr3_2mass.fits')
+    umetal = np.unique(alliso['METAL'])
+    uage = np.unique(alliso['AGE']/1e9)
     bestmetal,bestmetalind = dln.closest(umetal,metal_salaris)
     bestage,bestageind = dln.closest(uage,age)
 
     print('Closest isochrone values')
-    print('Age = {:.2f} Gyr'.format(bestage))
+    print('Age = {:.4f} Gyr'.format(bestage))
     print('[M/H] = {:.2f}'.format(bestmetal))
     print('[alpha/Fe] = {:.2f}'.format(alpha))    
-
+    
     # Get the isochrone
-    isoind, = np.where((alliso['MH']==bestmetal) & (10**alliso['LOGAGE']/1e9==bestage))
+    isoind, = np.where((alliso['METAL']==bestmetal) & (alliso['AGE']/1e9==bestage))
     iso = alliso[isoind]
-    iso['AGE'] = 10**iso['LOGAGE']
+    #iso['AGE'] = 10**iso['LOGAGE']
     
     # --- Create synthetic photometry ---
-    bands = ['GMAG','G_BPMAG','G_RPMAG']
-    stab = synth(iso,bands,minlabel=1,maxlabel=9,nstars=100000)
+    #bands = ['GMAG','G_BPMAG','G_RPMAG']
+    stab = synth(iso,[],minlabel=1,maxlabel=9,nstars=100000)
     
     # Make 2-D bins so we don't have to interpolate so many spectra
     data = stab['LOGTE'],stab['LOGG']
@@ -227,7 +290,7 @@ def ssp(age,metal,alpha,alliso=None):
     
     
 def synth(iso,bands,nstars=None,totmass=None,minlabel=1,maxlabel=8,minmass=0,maxmass=1000,
-          columns=['AGE','METAL','MINI','MASS','LOGTE','LOGG','LOGL','LABEL']):
+          columns=['AGE','METAL','MINI','LOGTE','LOGG','LOGL','LABEL']):
     """ Create synthetic population."""
     
     # By default us 1000 stars
