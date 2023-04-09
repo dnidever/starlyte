@@ -233,8 +233,6 @@ def interp(pars,wave=None,cont=None,ncont=None,grid='jwstgiant4.dat',
         wave = info['WAVELENGTH'].copy()
 
     out = {'wave':wave,'flux':mflux}
-
-    import pdb; pdb.set_trace()
     
     # Delete temporary files and directory
     os.chdir(curdir)

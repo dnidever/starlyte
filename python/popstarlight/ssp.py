@@ -1,12 +1,28 @@
 
 ## Create simple stellar population (SSP) synthetic spectra
 
+import os
 import numpy as np
+from glob import glob
 from dlnpyutils import utils as dln
 from astropy.table import Table
 from scipy.interpolate import interp1d
 from scipy.stats import binned_statistic_2d
-from . import ferre
+from . import ferre,utils
+
+# Get FERRE grid info
+headerfiles = glob(utils.datadir()+'ssp*grid*.hdr')  # Get grid header files
+dt = [('filename',str,200),('teffrange',float,2),('loggrange',float,2)]
+GRIDINFO = np.zeros(len(headerfiles),dtype=np.dtype(dt))
+# Get header Teff/logg ranges
+for i in range(len(headerfiles)):
+    hinfo = ferre.gridinfo(headerfiles[i])
+    GRIDINFO['filename'][i] = headerfiles[i]
+    GRIDINFO['teffrange'][i] = [np.min(hinfo['TEFF']),np.max(hinfo['TEFF'])]
+    GRIDINFO['loggrange'][i] = [np.min(hinfo['LOGG']),np.max(hinfo['LOGG'])]
+# Sort them by temperature
+si = np.argsort(GRIDINFO['teffrange'][:,0])
+GRIDINFO = GRIDINFO[si]
 
 def ferre_interp(pars):
     """ Interpolated spectra in grid using FERRE."""
@@ -15,7 +31,7 @@ def ferre_interp(pars):
     if pars.ndim==1:
         pars = np.atleast_2d(pars)
     npars = pars.shape[0]
-        
+    
     # cool grid 1:     3500 <= Teff <=  6000, 0.0 <= logg <= 5.0
     # cool grid 2:     6000 <= Teff <=  8000, 1.0 <= logg <= 5.0
     # medium grid 1:   8000 <= Teff <= 11750, 2.0 <= logg <= 5.0
@@ -25,13 +41,13 @@ def ferre_interp(pars):
     # hot grid 3:     31000 <= Teff <= 39000, 4.0 <= logg <= 5.0
     # hot grid 4:     39000 <= Teff <= 49000, 4.5 <= logg <= 5.0        
     
-    teffranges = np.array([[3500,6000],[6000,8000],[8000,11750],[11500,19500],
-                           [19000,26000],[26000,31000],[31000,39000],[39000,49000]]).astype(float)
-    loggranges = np.array([[0.0,5.0],[1.0,5.0],[2.0,5.0],[2.5,5.0],[3.0,5.0],
-                           [3.5,5.0],[4.0,5.0],[4.5,5.0]])
-    gridfiles = ['coolgrid1','coolgrid2','mediumgrid1','mediumgrid2',
-                 'hotgrid1','hotgrid2','hotgrid3','hotgrid4']
-    ngrids = len(gridfiles)
+    #teffranges = np.array([[3500,6000],[6000,8000],[8000,11750],[11500,19500],
+    #                       [19000,26000],[26000,31000],[31000,39000],[39000,49000]]).astype(float)
+    #loggranges = np.array([[0.0,5.0],[1.0,5.0],[2.0,5.0],[2.5,5.0],[3.0,5.0],
+    #                       [3.5,5.0],[4.0,5.0],[4.5,5.0]])
+    #gridfiles = ['coolgrid1','coolgrid2','mediumgrid1','mediumgrid2',
+    #             'hotgrid1','hotgrid2','hotgrid3','hotgrid4']
+    ngrids = len(GRIDINFO)
     
     # Loop over each star and assign it to a grid based on teff/logg
     gridindex = np.zeros(npars,int)
@@ -40,19 +56,19 @@ def ferre_interp(pars):
         pars1 = pars[i,:]  # teff, logg, metal, alpha
         teff1 = pars1[0]
         logg1 = pars1[1]
-        if teff1 < np.min(teffranges):
+        if teff1 < np.min(GRIDINFO['teffrange']):
             gridindex[i] = 0
-        elif teff1 > np.max(teffranges):
+        elif teff1 > np.max(GRIDINFO['teffrange']):
             gridindex[i] = ngrids-1
         else:
-            ind, = np.where((teff1 >= teffranges[:,0]) &
-                            (teff1 <= teffranges[:,1]))
+            ind, = np.where((teff1 >= GRIDINFO['teffrange'][:,0]) &
+                            (teff1 <= GRIDINFO['teffrange'][:,1]))
             gridindex[i] = ind[0]
                             
         # Deal with out of bounds teff/logg values
         #  set to the boundary
-        teffr = teffranges[gridindex[i],:]
-        loggr = loggranges[gridindex[i],:]        
+        teffr = GRIDINFO['teffrange'][gridindex[i],:]
+        loggr = GRIDINFO['loggrange'][gridindex[i],:]        
         if teff1 < teffr[0]:
             newpars[i,0] = teffr[0]+10
         elif teff1 > teffr[1]:
@@ -68,7 +84,7 @@ def ferre_interp(pars):
     # Loop over gridfiles and get all of the spectra
     # that fall in its teff range
     count = 0
-    for i,gfile in enumerate(gridfiles):
+    for i in range(ngrids):
         ind, = np.where(gridindex == i)
         nind = len(ind)
         if nind==0:
@@ -76,11 +92,10 @@ def ferre_interp(pars):
         pars2 = pars[ind,:]
         newpars2 = newpars[ind,:]        
 
+        gfile = os.path.basename(GRIDINFO['filename'][i])
         print(i+1,len(ind),gfile)
-
-        import pdb; pdb.set_trace()
         
-        gfile = 'ssp'+gridfiles[i]+'.dat'
+        # Interpolate in the FERRE grid
         fout = ferre.interp(newpars2,grid=gfile)
 
         # Wavelength solution
@@ -95,21 +110,18 @@ def ferre_interp(pars):
 
         # some spectra are bad, all -4093520 values
         
-        import pdb; pdb.set_trace()
-        
         count += nind
-
-    # Rescale the blackbody if outside the temperature range
-    bd, = np.where(pars[:,0] != newpars[:,0])
-    nbd = len(bd)
-    for i in range(nbd):
-        ind = bd[i]
-        teff0 = pars[ind,0]
-        teff1 = newpars[ind,0]
-        bb0 = planck(wave,teff0)
-        bb1 = planck(wave,teff1)        
         
-
+    # Rescale the blackbody if outside the temperature range
+    #bd, = np.where(pars[:,0] != newpars[:,0])
+    #nbd = len(bd)
+    #for i in range(nbd):
+    #    ind = bd[i]
+    #    teff0 = pars[ind,0]
+    #    teff1 = newpars[ind,0]
+    #    #bb0 = planck(wave,teff0)
+    #    #bb1 = planck(wave,teff1)        
+        
         
     # Put everything together
     out = {'wave':wave,'flux':flux}
@@ -188,21 +200,16 @@ def ssp(age,metal,alpha,alliso=None):
     # Use FERRE to interpolate in the grid to the
     # synthetic photometric Teff, logg, [Fe/H], and [alpha/Fe]
     fout = ferre_interp(pars)
-    wave = fout['wave']
-    flux = fout['flux']
+    wave = fout['wave']   # 1-D wavelength array
+    flux = fout['flux']   # 2-D flux array [Nspec,Nwavelength]
     npix = len(wave)
-
-    # !!!!!! some ferre interpolated spectra are BAD!!!!!!!
-    
     
     # Convert each spectrum to a total flux of 1 Lsun
     dw = 0.1
     lsun = 3.846e33   # erg/s
     totflux = np.sum(flux*dw,axis=1)
-    scalefactor = totflux / lsun
+    scalefactor = lsun / totflux
     scaleflux = flux * scalefactor.reshape(-1,1)
-    
-    import pdb; pdb.set_trace()
     
     # Combine all of the spectra with appropriate luminosity weighting
     spectrum = np.sum(scaleflux * totluminosity.reshape(-1,1),axis=0)
