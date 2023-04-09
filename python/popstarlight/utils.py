@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import gdown
 from scipy.special import erf
 from functools import wraps
 from scipy import interpolate
@@ -232,3 +233,36 @@ def is_binaryfile(filename):
             return False
     except UnicodeDecodeError: # Found non-text data
         return True  
+
+def download_data(force=False):
+    """ Download the data from my Google Drive."""
+
+    # Check if the "done" file is there
+    if os.path.exists(datadir()+'done') and force==False:
+        return
+    
+    data = [{'id':'1ROFRWH825gRBJajordcRcLf_oL0f1JEM','output':'sspcoolgrid1.unf'},
+            {'id':'13ybYBEy2hV6zi9KWe7Tv3uyboqFsRCG3','output':'sspcoolgrid2.unf'},
+            {'id':'1pZx8Vx0J-fb9uFTGVHDk5c-vhe4Qx6SN','output':'sspcoolgrid3.unf'},
+            {'id':'1hFYot7T5ZclbmmZDY_M7drE1ED2xKqaI','output':'sspmediumgrid1.unf'},
+            {'id':'1B28nje9vDx2yFdNyR5V36d_aQOVKIW9V','output':'sspmediumgrid2.unf'},
+            {'id':'1YvBENKuLpWH4Lop6jkPmAb1BanGDJBdm','output':'ssphotgrid1.unf'},
+            {'id':'13ZVGiev-CG2RWljE8kjBnvHdc2SbneCv','output':'ssphotgrid2.unf'},
+            {'id':'1HCCaK1ET_4H1XRuDe7jRfi7-x1TsK-dJ','output':'ssphotgrid3.unf'},
+            {'id':'10iGSwlO-pwz3aisKDSZml3hwGbx634kS','output':'ssphotgrid4.unf'}]
+    
+    # This should take 2-3 minutes on a good connection
+    
+    # Do the downloading
+    t0 = time.time()
+    print('Downloading '+str(len(data))+' PopStarLight data files')
+    for i in range(len(data)):
+        print(str(i+1)+' '+data[i]['output'])
+        fileid = data[i]['id']
+        url = f'https://drive.google.com/uc?id={fileid}'
+        output = datadir()+data[i]['output']  # save to the data directory
+        if os.path.exists(output)==False or force:
+            gdown.download(url, output, quiet=False)
+
+    print('All done in {:.1f} seconds'.format(time.time()-t0))
+
