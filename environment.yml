@@ -1,0 +1,12 @@
+name: gaiaxpspec
+
+channels:
+  - astropy
+  - conda-forge
+
+dependencies:
+  - python=3
+  - sphinx
+  - pip:
+    - -r requirements-dev.txt
+    - -e .
