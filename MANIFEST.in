@@ -1,4 +1,5 @@
 include README.rst
-include data/*
+include data/*unf
+include data/ssp_isochrones.fits.gz
 
 prune build
