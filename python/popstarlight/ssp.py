@@ -26,28 +26,36 @@ si = np.argsort(GRIDINFO['teffrange'][:,0])
 GRIDINFO = GRIDINFO[si]
 
 def ferre_interp(pars):
-    """ Interpolated spectra in grid using FERRE."""
+    """
+    Interpolate multiple spectra in grid using FERRE.
+
+    Parameters
+    ----------
+    pars : numpy array
+       Array of parameter values.  Should have dimensions
+       of [Nlabels] or [Nstars,Nlabels].  The labels with
+       default FERRE synthetic spectral grids should be
+       [Teff,logg,[M/H],[alpha/M].
+
+    Returns
+    -------
+    out : dict
+       Dictionary with 1-D wavelength array in "wave", and 2-D
+       flux array in "flux" [Nstars,Nwave].
+
+    Example
+    -------
+
+    out = ferre_interp(pars)
+
+    """
+    
     # pars = [teff,logg,metal,alpha]
     # can be 2D
     if pars.ndim==1:
         pars = np.atleast_2d(pars)
     npars = pars.shape[0]
-    
-    # cool grid 1:     3500 <= Teff <=  6000, 0.0 <= logg <= 5.0
-    # cool grid 2:     6000 <= Teff <=  8000, 1.0 <= logg <= 5.0
-    # medium grid 1:   8000 <= Teff <= 11750, 2.0 <= logg <= 5.0
-    # medium grid 2:  11500 <= Teff <= 19500, 2.5 <= logg <= 5.0
-    # hot grid 1:     19000 <= Teff <= 26000, 3.0 <= logg <= 5.0
-    # hot grid 2:     26000 <= Teff <= 31000, 3.5 <= logg <= 5.0
-    # hot grid 3:     31000 <= Teff <= 39000, 4.0 <= logg <= 5.0
-    # hot grid 4:     39000 <= Teff <= 49000, 4.5 <= logg <= 5.0        
-    
-    #teffranges = np.array([[3500,6000],[6000,8000],[8000,11750],[11500,19500],
-    #                       [19000,26000],[26000,31000],[31000,39000],[39000,49000]]).astype(float)
-    #loggranges = np.array([[0.0,5.0],[1.0,5.0],[2.0,5.0],[2.5,5.0],[3.0,5.0],
-    #                       [3.5,5.0],[4.0,5.0],[4.5,5.0]])
-    #gridfiles = ['coolgrid1','coolgrid2','mediumgrid1','mediumgrid2',
-    #             'hotgrid1','hotgrid2','hotgrid3','hotgrid4']
+
     ngrids = len(GRIDINFO)
     
     # Loop over each star and assign it to a grid based on teff/logg
@@ -109,29 +117,50 @@ def ferre_interp(pars):
         # Fill in the spectra
         flux[count:count+nind,:] = fout['flux']
         totflux = np.sum(flux,axis=1)
-
-        # some spectra are bad, all -4093520 values
         
         count += nind
-        
-    # Rescale the blackbody if outside the temperature range
-    #bd, = np.where(pars[:,0] != newpars[:,0])
-    #nbd = len(bd)
-    #for i in range(nbd):
-    #    ind = bd[i]
-    #    teff0 = pars[ind,0]
-    #    teff1 = newpars[ind,0]
-    #    #bb0 = planck(wave,teff0)
-    #    #bb1 = planck(wave,teff1)        
-        
-        
+
     # Put everything together
     out = {'wave':wave,'flux':flux}
     return out
 
 
-def sspgrid(ages,metals,alphas,outdir='./',clobber=False):
-    """  Run a grid of SSP spectra."""
+def sspgrid(ages,metals,alphas,tempsave=True,outdir='./',clobber=False):
+    """
+    Run a grid of SSP spectra.
+
+    Parameters
+    ----------
+    ages : numpy array or list
+       A list or numpy array of ages in Gyr.
+    metals : numpy array or list
+       A list or numpy array of metallicities.
+    alphas : numpy array or list
+       A list or numpy array of alpha abundances [alpha/M].
+    tempsave : boolean, optional
+       Save the individual SSP synthetic spectra to a temporary directory.
+       This allows for an easy restart if there is a crash.  Default is True.
+    outdir : str, optional
+       The output directory for the temporary SSP synthetic spectra.  Default
+       is "./".
+    clobber : bool, optional
+       Overwrite existing saved SSP synthetic spectra.  Default is False.
+
+    Returns
+    -------
+    wave : numpy array
+       Wavelength array, 1-D.
+    spectra : numpy array
+       Grid of SSP synthetic spectra with size [Nages,Nmetals,Nalphas,Nwave].
+    pars : numpy array
+       Array of parameters with size [Nages,Nmetals,Nalphas,Nwave].
+
+    Example
+    -------
+
+    wave,spectra,pars = sspgrid(ages,metals,alphas)
+
+    """
 
     nage = len(ages)
     nmetal = len(metals)
@@ -151,14 +180,20 @@ def sspgrid(ages,metals,alphas,outdir='./',clobber=False):
                 alpha = alphas[k]
                 print('{:d} (age,[M/H],[alpha/M])=({:.4f},{:.4f},{:.4f})'.format(count+1,age,metal,alpha))
 
-                outfile = 'ssp_a{:.3f}m{:+.2f}a{:+.2f}.fits'.format(11,metal,alpha)
+                outfile = 'ssp_a{:.3f}m{:+.2f}a{:+.2f}.fits'.format(age,metal,alpha)
                 if os.path.exists(outdir+outfile) and clobber==False:
                     print(outfile+' already exists and clobber not set')
                     spectrum,hd = fits.getdata(outdir+outfile,header=True)
                     wave = np.arange(hd['naxis1'])*hd['cdelt1']+hd['crval1']
-                else:  
-                    wave,spectrum = ssp(age,metal,alpha)
-                    
+                else:
+                    try:
+                        wave,spectrum = ssp(age,metal,alpha)
+                    except:
+                        print('CRASH!!!!')
+                        print(' ')
+                        import pdb; pdb.set_trace()
+                        continue
+                        
                 # Start grid
                 if count == 0:
                     nwave = len(wave)
@@ -190,7 +225,35 @@ def sspgrid(ages,metals,alphas,outdir='./',clobber=False):
 
                 
 def ssp(age,metal,alpha,alliso=None):
-    """ Make SSP for a given age and metal."""
+    """
+    Make SSP (simple stellar population)) for a given age,
+    metallicity and alpha abundance.
+
+    Parameters
+    ----------
+    age : float
+       Age of the SSP in Gyr.
+    metal : float
+       Metallicity of the SSP.
+    alpha : float
+       The [alpha/M] abundance of the SSp.
+    alliso : table, optional
+       The full isochrone table.  This can save some
+       time if it does not need to be imported every time.
+
+    Returns
+    -------
+    wave : numpy array
+       Wavelength array.
+    spectrum : numpy array
+       SSP synthetic spectrum array.
+
+    Example
+    -------
+
+    wave,spectrum = ssp(1.0,-1.5,0.3)
+
+    """
 
     print('Age = {:.4f} Gyr'.format(age))
     print('[M/H] = {:.2f}'.format(metal))
@@ -204,7 +267,7 @@ def ssp(age,metal,alpha,alliso=None):
     if alliso is None:
         alliso = Table.read(utils.datadir()+'ssp_isochrones.fits.gz')
         for c in alliso.colnames: alliso[c].name = c.upper()
-        #alliso = Table.read('/Users/nidever/isochrone/parsec_gaiaedr3_2mass/parsec_gaiaedr3_2mass.fits')
+
     umetal = np.unique(alliso['METAL'])
     uage = np.unique(alliso['AGE']/1e9)
     bestmetal,bestmetalind = dln.closest(umetal,metal_salaris)
@@ -215,13 +278,11 @@ def ssp(age,metal,alpha,alliso=None):
     print('[M/H] = {:.2f}'.format(bestmetal))
     print('[alpha/Fe] = {:.2f}'.format(alpha))    
     
-    # Get the isochrone
+    # Get the isochrone we want
     isoind, = np.where((alliso['METAL']==bestmetal) & (alliso['AGE']/1e9==bestage))
     iso = alliso[isoind]
-    #iso['AGE'] = 10**iso['LOGAGE']
     
     # --- Create synthetic photometry ---
-    #bands = ['GMAG','G_BPMAG','G_RPMAG']
     stab = synth(iso,[],minlabel=1,maxlabel=9,nstars=100000)
     
     # Make 2-D bins so we don't have to interpolate so many spectra
@@ -246,6 +307,11 @@ def ssp(age,metal,alpha,alliso=None):
         nind = len(ind)
         totluminosity[i] = np.sum(10**stab['LOGL'][ind])
         ubin2d = np.array(ubinid.split('-')).astype(int)
+        # values that are beyond the bounds are set to N
+        if ubin2d[0]==len(teff_edge):
+            ubin2d[0] -= 1
+        if ubin2d[1]==len(logg_edge):
+            ubin2d[1] -= 1            
         # the indices give the upper value of the "edge"
         # so we need to subtract 1 to get the correct "center"
         pars[i,0] = teff_center[ubin2d[0]-1]  
@@ -291,7 +357,44 @@ def ssp(age,metal,alpha,alliso=None):
     
 def synth(iso,bands,nstars=None,totmass=None,minlabel=1,maxlabel=8,minmass=0,maxmass=1000,
           columns=['AGE','METAL','MINI','LOGTE','LOGG','LOGL','LABEL']):
-    """ Create synthetic population."""
+    """
+    Create synthetic population with an isochrone and its IMF information.
+
+    Parameters
+    ----------
+    iso : table
+       The isochrone table.
+    bands : list
+       List of the bands to interpolate.  Can also be an empty list.
+    nstars : int, optional
+       Number of total stars to simulate.  Default is 1000.
+    totmass : float, optional
+       Total mass to use for the stellar populations.  If nstars and totmass
+       are not input, then 1000 stars will be used and the total mass will be
+       set accordingly.
+    minlabel : int, optional
+       Minimum PARSEC label to use.  Default is 1.
+    maxlabel : int, optional
+       Maximum PRASEC label to use.  Default is 8.
+    minmass : float, optional
+       Minimum stellar mass to use.  Default is 0.
+    maxmass : float, optional
+       Maximum stellar mass to use.  Default is 1000.
+    columns : list, optional
+       Columns to include in the output table.  Default is ['AGE','METAL',
+       'MINI','LOGTE','LOGG','LOGL','LABEL'].
+
+    Returns
+    -------
+    out : table
+       Table of the simulated stars from the isochrone.
+
+    Example
+    -------
+
+    tab = synth(iso)
+
+    """
     
     # By default us 1000 stars
     if nstars is None and totmass is None:
