@@ -13,7 +13,8 @@ from . import ferre,utils
 
 # Get FERRE grid info
 headerfiles = glob(utils.datadir()+'ssp*grid*.hdr')  # Get grid header files
-dt = [('filename',str,200),('teffrange',float,2),('loggrange',float,2)]
+dt = [('filename',str,200),('teffrange',float,2),('loggrange',float,2),
+      ('mhrange',float,2),('alpharange',float,2)]
 GRIDINFO = np.zeros(len(headerfiles),dtype=np.dtype(dt))
 # Get header Teff/logg ranges
 for i in range(len(headerfiles)):
@@ -21,6 +22,8 @@ for i in range(len(headerfiles)):
     GRIDINFO['filename'][i] = headerfiles[i]
     GRIDINFO['teffrange'][i] = [np.min(hinfo['TEFF']),np.max(hinfo['TEFF'])]
     GRIDINFO['loggrange'][i] = [np.min(hinfo['LOGG']),np.max(hinfo['LOGG'])]
+    GRIDINFO['mhrange'][i] = [np.min(hinfo['[M/H]']),np.max(hinfo['[M/H]'])]
+    GRIDINFO['alpharange'][i] = [np.min(hinfo['[ALPHA/M]']),np.max(hinfo['[ALPHA/M]'])]    
 # Sort them by temperature
 si = np.argsort(GRIDINFO['teffrange'][:,0])
 GRIDINFO = GRIDINFO[si]
@@ -65,6 +68,8 @@ def ferre_interp(pars):
         pars1 = pars[i,:]  # teff, logg, metal, alpha
         teff1 = pars1[0]
         logg1 = pars1[1]
+        metal1 = pars1[2]
+        alpha1 = pars1[3]        
         if teff1 < np.min(GRIDINFO['teffrange']):
             gridindex[i] = 0
         elif teff1 > np.max(GRIDINFO['teffrange']):
@@ -77,17 +82,26 @@ def ferre_interp(pars):
         # Deal with out of bounds teff/logg values
         #  set to the boundary
         teffr = GRIDINFO['teffrange'][gridindex[i],:]
-        loggr = GRIDINFO['loggrange'][gridindex[i],:]        
-        if teff1 < teffr[0]:
-            newpars[i,0] = teffr[0]+10
-        elif teff1 > teffr[1]:
-            newpars[i,0] = teffr[1]-10
-        if logg1 < loggr[0]:
-            newpars[i,1] = loggr[0]+0.02
-        elif logg1 > loggr[1]:
-            newpars[i,1] = loggr[1]-0.02
-
-
+        loggr = GRIDINFO['loggrange'][gridindex[i],:]
+        mhr = GRIDINFO['mhrange'][gridindex[i],:]
+        alphar = GRIDINFO['alpharange'][gridindex[i],:]        
+        if teff1 <= (teffr[0]+1):
+            newpars[i,0] = teffr[0]+5
+        elif teff1 >= (teffr[1]-1):
+            newpars[i,0] = teffr[1]-5
+        if logg1 <= (loggr[0]+0.01):
+            newpars[i,1] = loggr[0]+0.01
+        elif logg1 >= (loggr[1]-0.01):
+            newpars[i,1] = loggr[1]-0.01
+        if metal1 <= (mhr[0]+0.002):
+            newpars[i,2] = mhr[0]+0.002
+        elif metal1 >= (mhr[1]-0.002):
+            newpars[i,2] = mhr[1]-0.002
+        if alpha1 <= (alphar[0]+0.002):
+            newpars[i,3] = alphar[0]+0.002
+        elif alpha1 >= (alphar[1]-0.002):
+            newpars[i,3] = alphar[1]-0.002          
+            
     print('Interpolating '+str(npars)+' spectra with FERRE')
             
     # Loop over gridfiles and get all of the spectra
@@ -283,7 +297,8 @@ def ssp(age,metal,alpha,alliso=None):
     iso = alliso[isoind]
     
     # --- Create synthetic photometry ---
-    stab = synth(iso,[],minlabel=1,maxlabel=9,nstars=100000)
+    stab = synth(iso,[],minlabel=0,maxlabel=9,nstars=100000)
+    totmass = np.sum(stab['MINI'])
     
     # Make 2-D bins so we don't have to interpolate so many spectra
     data = stab['LOGTE'],stab['LOGG']
@@ -343,14 +358,17 @@ def ssp(age,metal,alpha,alliso=None):
     # Combine all of the spectra with appropriate luminosity weighting
     spectrum = np.sum(scaleflux * totluminosity.reshape(-1,1),axis=0)
 
+    # Now normalize by the total mass
+    spectrum /= totmass
+    
     # Units
     # synspec returns fluxed spectra in erg/cm2/s/A
     # PARSEC luminosities are in solar luminosity units (3.846 x 10^33 erg/s)
     # each pixel is 0.1 A
 
     # np.sum(spectrum*dw) / lsun
-    print('Final spectrum luminosity = {:8.2f} Lsun'.format(np.sum(spectrum*dw) / lsun))
-    print('Total synthetic photometry luminosity = {:8.2f} Lsun'.format(np.sum(totluminosity)))
+    print('Final spectrum luminosity = {:.2f} Lsun of 1Msun'.format(np.sum(spectrum*dw) / lsun))
+    print('Total synthetic photometry luminosity = {:.2f} Lsun'.format(np.sum(totluminosity)/totmass))
     
     return wave,spectrum
     
@@ -415,7 +433,7 @@ def synth(iso,bands,nstars=None,totmass=None,minlabel=1,maxlabel=8,minmass=0,max
     ndata = len(data)
     if ndata==0:
         raise ValueError('No isochrone points left after mass cut')
-
+    
     # Total mass input, figure out the number of stars we expect
     # for our stellar mass range
     if nstars is None and totmass is not None:

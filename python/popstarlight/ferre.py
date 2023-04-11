@@ -136,7 +136,12 @@ def interp(pars,wave=None,cont=None,ncont=None,grid='jwstgiant4.dat',
         griddir = utils.datadir()
     gridfile = griddir+grid
     if ferresrc is None:
-        ferresrc = '/Users/nidever/projects/ferre/bin/ferre.x'
+        ferresrc = subprocess.check_output(['which','ferre'])
+        if type(ferresrc) is bytes:
+            ferresrc = ferresrc.decode().strip()
+        if os.path.exists(ferresrc)==False:
+            raise Exception('No FERRE executable found')
+        #ferresrc = '/Users/nidever/projects/ferre/bin/ferre'
     info = gridinfo(gridfile)
     
     # Number of objects
