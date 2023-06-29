@@ -63,7 +63,7 @@ exclude_patterns.append('_templates')
 # This is added to the end of RST files - a good place to put substitutions to
 # be used globally.
 rst_epilog += """
-.. |popstarlight| replace:: *popstarlight*
+.. |popstar| replace:: *popstar*
 """
 
 # -- Project information ------------------------------------------------------
@@ -110,7 +110,7 @@ release = package.__version__
 # Please update these texts to match the name of your package.
 html_theme_options = {
     'logotext1': ' ',
-    'logotext2': 'popstarlight',  # white,  semi-bold
+    'logotext2': 'popstar',  # white,  semi-bold
     'logotext3': ':docs'   # white,  light
 }
 # Add/Update "html_theme_options" like this on your conf.py
@@ -141,7 +141,7 @@ html_title = '{0} v{1}'.format(project, release)
 htmlhelp_basename = project + 'doc'
 
 html_static_path = ['_static']
-html_style = 'popstarlight.css'
+html_style = 'popstar.css'
 
 # -- Options for LaTeX output -------------------------------------------------
 

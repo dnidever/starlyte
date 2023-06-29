@@ -3,20 +3,20 @@ Installation
 ************
 
 
-Installing |popstarlight|
-=========================
+Installing |popstar|
+====================
 
-The easiest way to install |popstarlight| is with PyPi.
+The easiest way to install |popstar| is with PyPi.
 
 .. code-block:: bash
 
-    pip install popstarlight
+    pip install popstar
 
 To get the very latest version of the software, install it directly from GitHub.
     
 .. code-block:: bash
 
-    pip install git+https://github.com/dnidever/popstarlight
+    pip install git+https://github.com/dnidever/popstar
 
     
 

@@ -3,14 +3,14 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-************
-popstarlight
-************
+*******
+popstar
+*******
 
 Introduction
 ============
 
-|popstarlight| is a package to create SSP (simple stellar population) synthetic spectra.  These are often
+|popstar| is a package to create SSP (simple stellar population) synthetic spectra.  These are often
 used to compare to observed integrated light spectra.
 
 

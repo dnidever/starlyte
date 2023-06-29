@@ -3,10 +3,10 @@ Examples
 ********
 
 
-Running |popstarlight|
-======================
+Running |popstar|
+=================
 
-Here's an example of running Python |popstarlight|.
+Here's an example of running Python |popstar|.
 
 
 .. code-block:: python
