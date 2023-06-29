@@ -1,6 +1,6 @@
 
-popstarlight
-==================
+popstar
+=======
 
 Integrated light synthetic spectra of a simple stellar population.
 
@@ -14,5 +14,5 @@ Installation
 
 You can also pip install directly from GitHub::
 
-    pip install git+https://github.com/dnidever/popstarlight
+    pip install git+https://github.com/dnidever/popstar
 
