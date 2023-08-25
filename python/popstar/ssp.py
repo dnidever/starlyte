@@ -7,12 +7,16 @@ from glob import glob
 from dlnpyutils import utils as dln
 from astropy.table import Table
 from astropy.io import fits
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d,RegularGridInterpolator
 from scipy.stats import binned_statistic_2d
+from chronos.isochrone import IsoGrid
 from . import ferre,utils
 
 # Get FERRE grid info
-headerfiles = glob(utils.datadir()+'ssp*grid*.hdr')  # Get grid header files
+datadir = '/Users/nidever/synspec/winter2017/largessp/apogee/'
+headerfiles = glob(datadir+'largeapogeessp*grid*.hdr')  # Get grid header files
+#datadir = utils.datadir()
+#headerfiles = glob(datadir+'ssp*grid*.hdr')  # Get grid header files
 dt = [('filename',str,200),('teffrange',float,2),('loggrange',float,2),
       ('mhrange',float,2),('alpharange',float,2)]
 GRIDINFO = np.zeros(len(headerfiles),dtype=np.dtype(dt))
@@ -138,6 +142,47 @@ def ferre_interp(pars):
     out = {'wave':wave,'flux':flux}
     return out
 
+class SSPGrid:
+    """
+    A class to represent a multi-dimensional grid of SSP spectra.
+
+    Parameters
+    ----------
+    data : numpy array
+       Multi-dimensional numpy array of the spectral data.
+         The first dimension should always be the wavelength.
+    pars : list/tuple
+       List or tuple of the 1D parameter label for each dimension.
+
+    """
+    
+    def __init__(self,data,pars,method='cubic'):
+        self._data = data
+        self._pars = pars
+        self.ndim = len(pars)
+        self.nwave = len(pars[0])
+        self._gridinterp = RegularGridInterpolator(pars,data,method=method)
+
+    def __call__(self,pars):
+        """
+        Interplate in the grid
+
+        Parameters
+        ----------
+        pars : numpy array
+           Values for the non-wavelength dimension to interpolate.
+        """
+
+        # We can interpolate multple points by using (Npts,Nlabels).
+        # Do all wavelengths simultaneously
+        wave = self._pars[0]
+        pars2 = np.zeros((nwave,self.ndim),float)
+        pars2[:,0] = wave
+        for i in range(self.ndim-1):
+            pars2[:,i+1] = pars[i]
+        
+        return self._gridinterp(pars2)
+        
 
 def sspgrid(ages,metals,alphas,tempsave=True,outdir='./',clobber=False):
     """
@@ -238,7 +283,7 @@ def sspgrid(ages,metals,alphas,tempsave=True,outdir='./',clobber=False):
     return wave,spectra,pars
 
                 
-def ssp(age,metal,alpha,alliso=None):
+def ssp(age,metal,alpha,alliso=None,closest=False):
     """
     Make SSP (simple stellar population)) for a given age,
     metallicity and alpha abundance.
@@ -254,6 +299,9 @@ def ssp(age,metal,alpha,alliso=None):
     alliso : table, optional
        The full isochrone table.  This can save some
        time if it does not need to be imported every time.
+    closest : bool, optional
+       Use closest isochrone in the grid instead of interpolating.
+         The default is False.
 
     Returns
     -------
@@ -280,21 +328,28 @@ def ssp(age,metal,alpha,alliso=None):
     # --- Isochrones ---
     if alliso is None:
         alliso = Table.read(utils.datadir()+'ssp_isochrones.fits.gz')
-        for c in alliso.colnames: alliso[c].name = c.upper()
+        #for c in alliso.colnames: alliso[c].name = c.upper()
+        alliso['MASS'] = alliso['MINI']
+        grid = IsoGrid(alliso)
 
-    umetal = np.unique(alliso['METAL'])
-    uage = np.unique(alliso['AGE']/1e9)
-    bestmetal,bestmetalind = dln.closest(umetal,metal_salaris)
-    bestage,bestageind = dln.closest(uage,age)
+    if closest:
+        umetal = np.unique(alliso['METAL'])
+        uage = np.unique(alliso['AGE']/1e9)
+        bestmetal,bestmetalind = dln.closest(umetal,metal_salaris)
+        bestage,bestageind = dln.closest(uage,age)
 
-    print('Closest isochrone values')
-    print('Age = {:.4f} Gyr'.format(bestage))
-    print('[M/H] = {:.2f}'.format(bestmetal))
-    print('[alpha/Fe] = {:.2f}'.format(alpha))    
+        print('Closest isochrone values')
+        print('Age = {:.4f} Gyr'.format(bestage))
+        print('[M/H] = {:.2f}'.format(bestmetal))
+        print('[alpha/Fe] = {:.2f}'.format(alpha))    
     
-    # Get the isochrone we want
-    isoind, = np.where((alliso['METAL']==bestmetal) & (alliso['AGE']/1e9==bestage))
-    iso = alliso[isoind]
+        # Get the isochrone we want
+        isoind, = np.where((alliso['METAL']==bestmetal) & (alliso['AGE']/1e9==bestage))
+        iso = alliso[isoind]
+
+    else:
+        iso = grid(age*1e9,metal_salaris,names=['LOGL'])
+
     
     # --- Create synthetic photometry ---
     stab = synth(iso,[],minlabel=0,maxlabel=9,nstars=100000)

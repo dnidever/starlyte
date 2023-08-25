@@ -11,6 +11,6 @@ setup(name='popstar',
       url = 'https://github.com/dnidever/popstar',
       package_dir = {'': 'python'},
       packages = ["popstar"],
-      install_requires=['numpy','astropy(>=4.0)','scipy','dlnpyutils(>=1.0.3)','ferre','gdown'],
+      install_requires=['numpy','astropy(>=4.0)','scipy','dlnpyutils(>=1.0.3)','ferre','gdown','chronos'],
       include_package_data=True
 )
