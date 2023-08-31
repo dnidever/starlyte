@@ -184,7 +184,7 @@ class SSPGrid:
         return self._gridinterp(pars2)
         
 
-def sspgrid(ages,metals,alphas,tempsave=True,outdir='./',clobber=False):
+def sspgrid(ages,metals,alphas,tempsave=True,outdir='./',clobber=False,usesalaris=True):
     """
     Run a grid of SSP spectra.
 
@@ -204,6 +204,9 @@ def sspgrid(ages,metals,alphas,tempsave=True,outdir='./',clobber=False):
        is "./".
     clobber : bool, optional
        Overwrite existing saved SSP synthetic spectra.  Default is False.
+    usesalaris: bool, optional
+       Use Salaris correction when getting non-solar isochrone.
+         The default is True.
 
     Returns
     -------
@@ -246,7 +249,7 @@ def sspgrid(ages,metals,alphas,tempsave=True,outdir='./',clobber=False):
                     wave = np.arange(hd['naxis1'])*hd['cdelt1']+hd['crval1']
                 else:
                     try:
-                        wave,spectrum = ssp(age,metal,alpha)
+                        wave,spectrum = ssp(age,metal,alpha,usesalaris=usesalaris)
                     except:
                         print('CRASH!!!!')
                         print(' ')
@@ -283,7 +286,7 @@ def sspgrid(ages,metals,alphas,tempsave=True,outdir='./',clobber=False):
     return wave,spectra,pars
 
                 
-def ssp(age,metal,alpha,alliso=None,closest=False):
+def ssp(age,metal,alpha,alliso=None,closest=False,usesalaris=True):
     """
     Make SSP (simple stellar population)) for a given age,
     metallicity and alpha abundance.
@@ -302,6 +305,9 @@ def ssp(age,metal,alpha,alliso=None,closest=False):
     closest : bool, optional
        Use closest isochrone in the grid instead of interpolating.
          The default is False.
+    usesalaris: bool, optional
+       Use Salaris correction when getting non-solar isochrone.
+         The default is True.
 
     Returns
     -------
@@ -322,9 +328,12 @@ def ssp(age,metal,alpha,alliso=None,closest=False):
     print('[alpha/Fe] = {:.2f}'.format(alpha))    
 
     # Salaris correction
-    metal_salaris = metal + np.log10(0.659*(10**alpha)+0.341)
-    print('[M/H]_Salaris = {:.2f}'.format(metal_salaris))    
-    
+    if usesalaris:
+        metal_salaris = metal + np.log10(0.659*(10**alpha)+0.341)
+        print('[M/H]_Salaris = {:.2f}'.format(metal_salaris))    
+    else:
+        metal_salaris = metal
+        
     # --- Isochrones ---
     if alliso is None:
         alliso = Table.read(utils.datadir()+'ssp_isochrones.fits.gz')
