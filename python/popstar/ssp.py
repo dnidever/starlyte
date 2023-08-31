@@ -4,7 +4,7 @@
 import os
 import numpy as np
 from glob import glob
-from dlnpyutils import utils as dln
+from dlnpyutils import utils as dln,bindata
 from astropy.table import Table
 from astropy.io import fits
 from scipy.interpolate import interp1d,RegularGridInterpolator
@@ -142,6 +142,48 @@ def ferre_interp(pars):
     out = {'wave':wave,'flux':flux}
     return out
 
+
+def continuum(wave,flux,bins=50):
+    """
+    Find the continuum of a spectrum.
+
+    Parameters
+    ----------
+    wave : numpy array
+       Wavelength array.
+    flux : numpy array
+       Flux spectrum array.
+    bins : int, optional
+       Number of bins to use when finding the continuum.
+         Default is 50.
+
+    Returns
+    -------
+    cont : numpy array
+       The continuum of the spectrum.
+    coef : numpy array
+       The polynomial coefficients.
+
+    Example
+    -------
+
+    cont,coef = continuum(wave,flux)
+
+    """
+
+    npix = len(wave)
+    x = np.arange(npix)
+    
+    # The continuum normalization is a bit experimental
+    bins = 51
+    result,xedge,binnumber = bindata.binned_statistic(x,flux,bins=bins,statistic='max')
+    xbin = xedge[0:-1]+0.5*(xedge[1]-xedge[0])
+    coef = np.polyfit(xbin,result,3)
+    cont = np.polyval(coef,x)
+
+    return cont,coef
+    
+
 class SSPGrid:
     """
     A class to represent a multi-dimensional grid of SSP spectra.
@@ -184,7 +226,8 @@ class SSPGrid:
         return self._gridinterp(pars2)
         
 
-def sspgrid(ages,metals,alphas,tempsave=True,outdir='./',clobber=False,usesalaris=True):
+def sspgrid(ages,metals,alphas,tempsave=True,outdir='./',clobber=False,
+            usesalaris=True,normalize=False):
     """
     Run a grid of SSP spectra.
 
@@ -207,6 +250,9 @@ def sspgrid(ages,metals,alphas,tempsave=True,outdir='./',clobber=False,usesalari
     usesalaris: bool, optional
        Use Salaris correction when getting non-solar isochrone.
          The default is True.
+    normalize : bool, default
+       Normalize the synthetic spectra before weighting.
+         Default is False and use fluxed spectra.
 
     Returns
     -------
@@ -286,7 +332,7 @@ def sspgrid(ages,metals,alphas,tempsave=True,outdir='./',clobber=False,usesalari
     return wave,spectra,pars
 
                 
-def ssp(age,metal,alpha,alliso=None,closest=False,usesalaris=True):
+def ssp(age,metal,alpha,alliso=None,closest=False,usesalaris=True,normalize=False):
     """
     Make SSP (simple stellar population)) for a given age,
     metallicity and alpha abundance.
@@ -308,6 +354,9 @@ def ssp(age,metal,alpha,alliso=None,closest=False,usesalaris=True):
     usesalaris: bool, optional
        Use Salaris correction when getting non-solar isochrone.
          The default is True.
+    normalize : bool, default
+       Normalize the synthetic spectra before weighting.
+         Default is False and use fluxed spectra.
 
     Returns
     -------
@@ -411,6 +460,18 @@ def ssp(age,metal,alpha,alliso=None,closest=False,usesalaris=True):
     wave = fout['wave']   # 1-D wavelength array
     flux = fout['flux']   # 2-D flux array [Nspec,Nwavelength]
     npix = len(wave)
+
+    # Normalize
+    if normalize:
+        # apply summing mean/median/max
+        nspec = flux.shape[0]
+        origflux = flux.copy()
+        cont = flux.copy()*0
+        x = np.arange(npix)
+        for i in range(nspec):
+            cont1,coef1 = continuum(wave,origflux[i,:])
+            flux[i,:] = origflux[i,:] / cont1
+            cont[i,:] = cont1
     
     # Convert each spectrum to a total flux of 1 Lsun
     dw = 0.1
