@@ -1,16 +1,16 @@
-.. thebrog documentation master file, created by
+.. starlyte documentation master file, created by
    sphinx-quickstart on Tue Feb 16 13:03:42 2021.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-*******
-popstar
-*******
+********
+starlyte
+********
 
 Introduction
 ============
 
-|popstar| is a package to create SSP (simple stellar population) synthetic spectra.  These are often
+|starlyte| is a package to create SSP (simple stellar population) synthetic spectra.  These are often
 used to compare to observed integrated light spectra.
 
 

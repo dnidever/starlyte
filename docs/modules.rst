@@ -1,7 +1,7 @@
-popstar
-=======
+starlyte
+========
 
 .. toctree::
    :maxdepth: 4
 
-   popstar
+   starlyte

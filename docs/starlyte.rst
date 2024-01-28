@@ -1,29 +1,29 @@
-popstar package
-===============
+starlyte package
+================
 
 Submodules
 ----------
 
-popstar.ferre module
---------------------
+starlyte.ferre module
+---------------------
 
-.. automodule:: popstar.ferre
+.. automodule:: starlyte.ferre
    :members:
    :undoc-members:
    :show-inheritance:
 
-popstar.ssp module
-------------------
+starlyte.ssp module
+-------------------
 
-.. automodule:: popstar.ssp
+.. automodule:: starlyte.ssp
    :members:
    :undoc-members:
    :show-inheritance:
 
-popstar.utils module
---------------------
+starlyte.utils module
+---------------------
 
-.. automodule:: popstar.utils
+.. automodule:: starlyte.utils
    :members:
    :undoc-members:
    :show-inheritance:
@@ -31,7 +31,7 @@ popstar.utils module
 Module contents
 ---------------
 
-.. automodule:: popstar
+.. automodule:: starlyte
    :members:
    :undoc-members:
    :show-inheritance:

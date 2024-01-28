@@ -1,6 +1,6 @@
 
-popstar
-=======
+starlyte
+========
 
 Integrated light synthetic spectra of a simple stellar population.
 
@@ -14,5 +14,5 @@ Installation
 
 You can also pip install directly from GitHub::
 
-    pip install git+https://github.com/dnidever/popstar
+    pip install git+https://github.com/dnidever/starlyte
 

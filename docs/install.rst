@@ -3,20 +3,20 @@ Installation
 ************
 
 
-Installing |popstar|
-====================
+Installing |starlyte|
+=====================
 
-The easiest way to install |popstar| is with PyPi.
+The easiest way to install |starlyte| is with PyPi.
 
 .. code-block:: bash
 
-    pip install popstar
+    pip install starlyte
 
 To get the very latest version of the software, install it directly from GitHub.
     
 .. code-block:: bash
 
-    pip install git+https://github.com/dnidever/popstar
+    pip install git+https://github.com/dnidever/starlyte
 
     
 
